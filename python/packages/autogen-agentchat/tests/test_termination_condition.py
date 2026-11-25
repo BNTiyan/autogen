@@ -2,6 +2,9 @@ import asyncio
 from typing import Sequence
 
 import pytest
+from autogen_core.models import FunctionExecutionResult, RequestUsage
+from pydantic import BaseModel
+
 from autogen_agentchat.base import TerminatedException
 from autogen_agentchat.conditions import (
     ExternalTermination,
@@ -26,8 +29,6 @@ from autogen_agentchat.messages import (
     ToolCallExecutionEvent,
     UserInputRequestedEvent,
 )
-from autogen_core.models import FunctionExecutionResult, RequestUsage
-from pydantic import BaseModel
 
 
 @pytest.mark.asyncio
@@ -148,6 +149,11 @@ async def test_mention_termination() -> None:
         await termination([TextMessage(content="Hello", source="user"), TextMessage(content="stop", source="user")])
         is not None
     )
+    assert termination.terminated
+    with pytest.raises(TerminatedException):
+        await termination([])
+    await termination.reset()
+    assert not termination.terminated
     termination = TextMentionTermination("stop", sources=["agent"])
     assert await termination([TextMessage(content="stop", source="user")]) is None
     await termination.reset()
@@ -218,6 +224,11 @@ async def test_and_termination() -> None:
         await termination([TextMessage(content="Hello", source="user"), TextMessage(content="stop", source="user")])
         is not None
     )
+    assert termination.terminated
+    with pytest.raises(TerminatedException):
+        await termination([])
+    await termination.reset()
+    assert not termination.terminated
 
 
 @pytest.mark.asyncio
@@ -236,6 +247,11 @@ async def test_or_termination() -> None:
         await termination([TextMessage(content="Hello", source="user"), TextMessage(content="stop", source="user")])
         is not None
     )
+    assert termination.terminated
+    with pytest.raises(TerminatedException):
+        await termination([])
+    await termination.reset()
+    assert not termination.terminated
     await termination.reset()
     assert (
         await termination([TextMessage(content="Hello", source="user"), TextMessage(content="Hello", source="user")])
@@ -275,6 +291,22 @@ async def test_or_termination() -> None:
         )
         is not None
     )
+    assert termination.terminated
+    with pytest.raises(TerminatedException):
+        await termination([])
+    await termination.reset()
+    assert not termination.terminated
+
+
+@pytest.mark.asyncio
+async def test_or_termination_raises_terminated_exception() -> None:
+    termination = MaxMessageTermination(1) | TextMentionTermination("stop")
+    assert await termination([TextMessage(content="Hello", source="user")]) is not None
+    assert termination.terminated
+    with pytest.raises(TerminatedException):
+        await termination([TextMessage(content="World", source="user")])
+    await termination.reset()
+    assert not termination.terminated
 
 
 @pytest.mark.asyncio
